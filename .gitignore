@@ -6,6 +6,7 @@
 
 # Claude Code local config (per-machine: permission grants, local paths)
 .claude/settings.local.json
+.mcp.json
 
 # === Dependencies ===
 /node_modules
