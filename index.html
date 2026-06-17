@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>WebComms &amp; Pay — Demo</title>
+  <meta name="description" content="Interactive demo of WebComms & Pay: a multi-tenant, passwordless parent portal for schools, gyms and clubs." />
+  <link rel="icon" href="favicon.svg" type="image/svg+xml" />
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <!-- Persistent demo banner -->
+  <div id="demo-banner">
+    <strong>DEMO</strong> — mock data only. No real authentication, payments, or personal data. Nothing is sent anywhere.
+  </div>
+
+  <!-- App shell: views are toggled by app.js -->
+  <div id="app"></div>
+
+  <!-- Toast container -->
+  <div id="toast-host" aria-live="polite"></div>
+
+  <script src="data.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
