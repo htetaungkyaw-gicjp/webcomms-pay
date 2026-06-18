@@ -8,7 +8,8 @@
 .claude/settings.local.json
 # Claude Code per-machine agent state (memory, session projects) — never commit
 .claude/projects/
-.mcp.json
+# NOTE: .mcp.json is intentionally TRACKED (committed) — it holds only ${...} env
+# expansions + a non-secret project_ref. Do NOT add literal tokens to it.
 
 # === Dependencies ===
 /node_modules
@@ -28,6 +29,8 @@ next-env.d.ts
 # === Supabase (local stack) ===
 /supabase/.branches
 /supabase/.temp
+# Throwaway one-shot SQL bundle for manual dashboard apply
+/supabase/_cloud_apply_bundle.sql
 
 # === Testing ===
 /coverage
