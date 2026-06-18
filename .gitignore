@@ -6,6 +6,8 @@
 
 # Claude Code local config (per-machine: permission grants, local paths)
 .claude/settings.local.json
+# Claude Code per-machine agent state (memory, session projects) — never commit
+.claude/projects/
 .mcp.json
 
 # === Dependencies ===
