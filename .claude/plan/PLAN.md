@@ -6,6 +6,33 @@ Greenfield multi-tenant web platform for schools, gyms, and clubs. Parents log i
 
 The spine of the system is an invitation/onboarding flow: an invite token (carried through OTP) is the authorization proof that binds a user to the correct `tenant_id` + `role`, and a Phase 0 walking skeleton de-risks the auth → tenant → RLS integration before any CRUD is built. Schema- and contract-level compliance decisions (erasure-vs-retention, audit logging, controller/processor + DPA) are made up front because they cannot be retrofitted.
 
+> **⚠️ Infrastructure addendum (supersedes the local-Supabase assumptions below).**
+> This plan was written assuming a **local Supabase** dev stack (`supabase start` / Docker /
+> Mailpit) and a CLI `link → db diff → db push` migration path. **That is no longer how this
+> repo works.** The project is now **cloud-only**: there is no local Supabase stack, no
+> `config.toml`, and no `seed.sql`. Every environment (including local `next dev`) points at a
+> **cloud Supabase project** via `.env.local`; migrations are applied to cloud through the
+> **Supabase MCP / dashboard**; typegen uses `--project-id`; and the verification harnesses run
+> against the cloud project (self-seeding fixtures and reading the OTP via the Admin API
+> `generateLink`, since there is no Mailpit). Wherever the text below says "local Supabase",
+> "`supabase start`", "`--local`", "Mailpit", or "`db push`", read it through this addendum.
+> **[CLAUDE.md](../../CLAUDE.md) is the live source of truth for infrastructure.**
+
+---
+
+## Status (as of 2026-06-21)
+
+| Phase | State | Notes |
+|---|---|---|
+| **Phase 0 — Walking Skeleton** | ✅ **Done** | Shipped in `6dd8670`. All 4 migrations + onboarding spine routes + both verify harnesses exist; all exit criteria pass (see checklist below). |
+| **Phase 1 — Infrastructure** | 🟡 **Partial** | Next 16 + Supabase SSR + Stripe bootstrapped; cloud-only typegen (`--project-id`) wired; MCP + skills installed. **Not done:** Netlify config (`netlify.toml`), CI workflow (`ci.yml`), gitleaks/Dependabot, Upstash rate-limiting, Resend domain verification, full dep set (shadcn/ui, TanStack, react-big-calendar, etc.), Compliance Foundation artifacts. |
+| **Phase 2 — Auth/Onboarding/Admin** | 🟡 **Partial** | OTP login/verify/accept-invite pages + `[slug]` layout guard + admin/manage/portal stubs exist. **Not done:** `POST /api/invitations` route, invite-send email, rate limiting, OTP-verify throttling, full admin/manage CRUD UI. |
+| **Phase 3 — Portal & Admin CRUD** | ⬜ Pending | Portal/manage pages are stubs only. |
+| **Phase 4 — Payments & Scheduling** | 🟡 **Partial** | Checkout + webhook routes shipped and verified (`verify-payment.mjs`). **Not done:** `/api/appointments/book` (scheduling), refund handling. |
+| **Phase 5 — Testing/QA/Launch** | ⬜ Pending | Verify harnesses serve as the interim test suite (no Jest/Vitest). |
+
+**Divergences from the plan body now true in this repo** (the body below is the original plan; trust this table + CLAUDE.md where they conflict): cloud-only Supabase (no Docker/Mailpit/`config.toml`/`seed.sql`); **Netlify** hosting (not Vercel); region is **Asia Pacific** (not UK/EU — see Phase 1-I); typegen uses `--project-id` (not `--local`); test suite is the two `scripts/verify-*.mjs` harnesses (not Vitest/Playwright yet).
+
 ---
 
 ## Tech Stack
@@ -14,7 +41,7 @@ The spine of the system is an invitation/onboarding flow: an invite token (carri
 |---|---|
 | Frontend/Backend | **Next.js 16** (App Router, TypeScript) — `create-next-app@latest` installs 16.x as of 2026 |
 | Database & Auth | Supabase (PostgreSQL + Email OTP + RLS) |
-| Hosting | Vercel |
+| Hosting | **Netlify** (`@netlify/plugin-nextjs`) — *plan originally said Vercel; see Status table* |
 | Payments | Stripe |
 | Email delivery | Resend (Supabase Auth SMTP + transactional) |
 | Rate limiting | **Upstash Redis** (`@upstash/ratelimit`) — user has Upstash experience |
@@ -34,7 +61,7 @@ The spine of the system is an invitation/onboarding flow: an invite token (carri
 - The service-role Supabase client (`lib/supabase/admin.ts`) is used **only** in Route Handlers — and because it **bypasses RLS, every admin-client handler must re-authenticate the caller AND authorize the specific resource** (ownership/tenant checks) before reading or writing.
 - **`src/types/database.ts` is COMMITTED** (generated, but CI has no DB access so it must be in the repo). Regenerate after every migration via `npm run db:types`; CI fails if it's stale.
 - **Migrations are developed against a LOCAL Supabase** (`supabase start`) or a dedicated dev project — never `db push` to production during development. Production migration is a gated Phase-5 step.
-- **Choose the Supabase region deliberately at project creation** (EU/UK if serving UK/EU schools — region cannot be changed later, and the data includes minors' PII).
+- **Choose the Supabase region deliberately at project creation** (region cannot be changed later, and the data includes minors' PII). ⚠️ The dev/stg project is in **Asia Pacific** — the prod region + its compliance framing is an unresolved go/no-go (see Phase 1-I "Region / scope go-no-go").
 - **Secret-leak defense is layered, not just `.gitignore`** (a public repo holding a Supabase service-role key = full DB bypass demands depth):
   - `.gitignore` (Phase 1, before first commit) must include `.env`, `.env*.local`, **`.claude/settings.local.json`** (Claude Code writes local permission grants/paths here — currently untracked and unignored in this repo), `node_modules/`, `.next/`, `.vercel/`, `*.pem`. Keep `.claude/settings.json` and `.claude/plan/` tracked.
   - Enable **GitHub Secret Scanning + Push Protection** (free on public repos) — blocks known-pattern secrets at push time.
@@ -58,16 +85,16 @@ Steps:
 4. Implement: `lib/supabase/{browser,server,admin}.ts`, `middleware.ts`, OTP login + verify **with `invite_token` passed through**, `/accept-invite`, `(tenant)/[slug]/layout.tsx` slug resolution + membership guard, a single invoice list page, `PayAllButton`, `/api/stripe/checkout`, `/api/stripe/webhook`.
 5. **Prove the spine + isolation:** accept an invite as Tenant A parent (token+OTP) → land in Tenant A with role `parent` → **see the pre-created student linked** → see their invoice; pay it (test card) → webhook flips to `paid`. Attempt Tenant B's slug → empty / `notFound()`. Log in as `system_admin` → see both tenants. Attempt to bind with a **wrong/absent token** → no profile, no access.
 
-**Phase 0 exit criteria (all must pass — these are the decision gates):**
-- [ ] A parent onboards via **invitation token + OTP** (NOT direct seed) and lands in the correct tenant/role
-- [ ] **Wrong/missing invite token → no profile created → no access** (proves the token is verified)
-- [ ] Admin-pre-created student (via `parent_email`) is **linked and visible** to the parent after first login
-- [ ] Parent A sees exactly their 1 invoice; sees 0 of Tenant B's rows; direct query for a Tenant B invoice id returns empty (RLS, not app logic)
-- [ ] Stripe test payment → webhook → invoice `paid` in DB
-- [ ] `system_admin` sees both tenants (role short-circuit works)
-- [ ] A `disabled` parent (set `profiles.status='disabled'`) can no longer read tenant data (proves the revocation fail-closed)
+**Phase 0 exit criteria — ✅ ALL PASSING** (verified by `scripts/verify-phase0.mjs` + `scripts/verify-payment.mjs` against the cloud dev project; shipped in `6dd8670`):
+- [x] A parent onboards via **invitation token + OTP** (NOT direct seed) and lands in the correct tenant/role
+- [x] **Wrong/missing invite token → no profile created → no access** (proves the token is verified)
+- [x] Admin-pre-created student (via `parent_email`) is **linked and visible** to the parent after first login
+- [x] Parent A sees exactly their 1 invoice; sees 0 of Tenant B's rows; direct query for a Tenant B invoice id returns empty (RLS, not app logic)
+- [x] Stripe test payment → webhook → invoice `paid` in DB (`verify-payment.mjs`)
+- [x] `system_admin` sees both tenants (role short-circuit works)
+- [x] A `disabled` parent (set `profiles.status='disabled'`) can no longer read tenant data (proves the revocation fail-closed)
 
-Only after Phase 0 passes do we proceed to build out the full schema and CRUD.
+Phase 0 has passed — the schema, RLS, onboarding trigger, and payment leg are proven. Subsequent phases build the full CRUD on top of this validated spine. **Re-run `verify-phase0.mjs` after any change to migrations `001`–`004`, the onboarding trigger, RLS, or the auth flow** (it is the standing regression gate, not a one-time check).
 
 ---
 
@@ -332,7 +359,7 @@ These are contract- or schema-level decisions that cannot be retrofitted or "sta
 - **Customer-facing DPA template (Art. 28):** scope, sub-processors with flow-down, security measures, breach-notification timelines, assistance with data-subject requests, deletion/return on termination. **A signed DPA with each tenant is a hard prerequisite to onboarding the first paying school** — school procurement will demand it day one. (This is *separate from* confirming DPAs with your upstream vendors.)
 - **DPIA skeleton (living doc):** large-scale processing of children's data is a near-automatic DPIA trigger (UK/EU GDPR Art. 35 + the UK Children's Code). Capture data flows, subject categories (children, parents), purposes, lawful basis, sub-processors + regions, risks (cross-tenant leakage, public-repo secret exposure, OTP account takeover) and mitigations.
 - **Erasure/retention schema split + audit_log** — already specified in §1-G; called out here because they are compliance gates, not features.
-- **Region / scope go-no-go:** Supabase region is a one-way door. **Decide explicitly:** v1 is **UK/EU-only** (state US schools are out of scope, EU/UK region intentional) — *or* if US schools are in scope, plan a per-region project + **FERPA/COPPA** contract addenda. Do not leave region as an unqualified single choice.
+- **Region / scope go-no-go — ⚠️ DIVERGED FROM PLAN, NOW AN OPEN COMPLIANCE QUESTION:** Supabase region is a one-way door and the dev/stg project was created in **Asia Pacific**, *not* the UK/EU region this plan originally assumed. The plan's entire compliance framing below (UK/EU GDPR, UK Children's Code, HMRC retention) was written for a UK/EU data residency that does **not** match the deployed region. **This must be resolved before any real tester PII lands:** either (a) re-create the prod project in a UK/EU region and keep the GDPR framing, or (b) commit to AP residency and redo the lawful-basis / cross-border-transfer / applicable-law analysis for the actual target market. Until decided, treat the GDPR-specific clauses below as *provisional*. (dev/stg AP is acceptable for test data; the **prod** region decision is the gate.)
 - **Sub-processor register + residency:** Stripe, Resend, Upstash, Vercel all process PII — record each, its region, and that transfers are covered.
 
 ### Phase 1 Verification

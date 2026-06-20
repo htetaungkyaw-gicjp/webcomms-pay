@@ -18,40 +18,42 @@ When asked to build a feature, follow PLAN.md and extend the existing skeleton; 
 This is the single most important constraint and it shapes every decision:
 
 - **Never commit a real secret.** All credentials use `${VAR}` env expansion ([.mcp.json](.mcp.json)) or empty placeholders ([.env.example](.env.example)). A service-role key in a public commit = full DB bypass. Any secret that *ever* reaches a commit is compromised → **must be rotated**, not just deleted.
-- `.env.local` and `.claude/settings.local.json` are gitignored and must stay untracked. `.claude/settings.json` and `.claude/plan/` are intentionally **tracked**.
+- `.env.local`, `.claude/settings.local.json`, and `.claude/projects/` (per-machine agent memory) are gitignored and must stay untracked. `.claude/plan/`, `.claude/agents/`, and `.claude/skills/` are intentionally **tracked**. There is no committed `.claude/settings.json` — only the local override exists.
 - Before any push or making the repo public, run the **Secret Leak Auditor** agent ([.claude/agents/secret-leak-auditor.md](.claude/agents/secret-leak-auditor.md)) as a gate — it scans the tree + git history for key patterns and verifies `.gitignore`/`.mcp.json` hygiene.
 
 ## Commands
 
-**Local dev loop:**
+**Dev loop (cloud-only — there is no local Supabase Docker stack):**
 ```bash
-npx supabase start          # local Postgres + Auth + Studio + Mailpit (email) in Docker
-npm run dev                 # Next.js 16 dev server → http://localhost:3000
-npm run db:types            # regenerate src/types/database.ts from the local DB
+npm run dev                 # Next.js 16 dev server → http://localhost:3000 (points at cloud Supabase via .env.local)
+npm run db:types            # regenerate src/types/database.ts from the cloud project (needs SUPABASE_ACCESS_TOKEN)
 npm run lint                # eslint (eslint-config-next)
 ```
 - **Where the running app points is set by `.env.local`** — see "Environments" below. The
-  `dev` environment runtime targets the **cloud** Supabase project; the local Docker stack
-  above is for migration authoring, `db reset`, typegen, and the verification harnesses.
-  Migration files (`supabase/migrations/*`) are environment-agnostic — author and prove
-  them locally, then push to a cloud project deliberately (`link → db diff → db push`).
-  **Never blind-`db push`**; never run the `verify-*.mjs` harnesses against a cloud DB
-  (they seed/mutate and assume the local demo keys).
-- `supabase start` applies `supabase/migrations/*` and runs `supabase/seed.sql`. To re-apply migrations from scratch: `npx supabase db reset`.
-- **Mailpit** (local email/OTP inbox) web UI and API are on the inbucket port from [supabase/config.toml](supabase/config.toml) (`http://127.0.0.1:54324`). OTP codes are read from there in local dev — there is no real email send.
-- Supabase Studio + the local API/anon/service keys are printed by `supabase start`; put them in `.env.local` (see [.env.example](.env.example) for the full var list).
+  app targets the **cloud** Supabase project in every environment; there is no local Docker
+  stack.
+- **Migrations** (`supabase/migrations/*`) are environment-agnostic SQL. Apply them to a
+  cloud project deliberately via the **Supabase MCP / dashboard** (the hosted MCP can apply
+  migrations and run SQL — see "MCP servers"). The Supabase **CLI link/db-push workflow is
+  not used** (no `config.toml`, no local stack). After applying a migration, regenerate
+  `src/types/database.ts` with `npm run db:types`.
+- **OTP / email**: cloud Supabase Auth sends real email (via Resend). There is no Mailpit.
+  For automated verification, the harnesses read the OTP from the service-role Admin API
+  (`generateLink`) instead of an inbox — see below.
+- The cloud project's URL + anon + service-role keys go in `.env.local` (see
+  [.env.example](.env.example) for the full var list). **Never commit them** — public repo.
 
 **Stripe (local):**
 ```bash
 stripe listen --forward-to localhost:3000/api/stripe/webhook   # forward webhooks; prints the signing secret → STRIPE_WEBHOOK_SECRET
 ```
 
-**Verification harnesses** (these are the test suite — there is no Jest/Vitest setup). Both load env from `.env.local` and require the dev stack up:
+**Verification harnesses** (these are the test suite — there is no Jest/Vitest setup). Both load env from `.env.local` and run against the **cloud** project. They are self-contained: each seeds its own namespaced fixtures via the service-role client, runs assertions, then deletes everything it created (the shared dev/stg DB is mutated transiently). `verify-phase0.mjs` reads the OTP via the Admin API (`generateLink`), so no email inbox is needed.
 ```bash
-node --env-file=.env.local scripts/verify-phase0.mjs    # drives the REAL onboarding spine via supabase-js + Mailpit OTP, then asserts tenant isolation / fail-closed through RLS
+node --env-file=.env.local scripts/verify-phase0.mjs    # drives the REAL onboarding spine via supabase-js + Admin-API OTP, then asserts tenant isolation / fail-closed through RLS
 node --env-file=.env.local scripts/verify-payment.mjs   # creates a real test Checkout Session, then delivers a properly-signed webhook event (exercises constructEvent + idempotency + paid-flip)
 ```
-`verify-phase0.mjs` is the Phase 0 exit-criteria gate — run it after any change to migrations, the onboarding trigger, RLS, or auth flow. `verify-payment.mjs` covers the payment leg.
+`verify-phase0.mjs` is the Phase 0 exit-criteria gate — run it after any change to migrations, the onboarding trigger, RLS, or auth flow. `verify-payment.mjs` covers the payment leg and delivers the webhook to your running app (`NEXT_PUBLIC_APP_URL`, default `http://localhost:3000`). Because they hit the shared cloud DB, run them against the dev/stg project only — **never against prod**.
 
 **Demo** (the separate static artifact, not the app):
 ```bash
@@ -63,20 +65,24 @@ README screenshots in `docs/screenshots/` are captured from the running demo (la
 
 Path alias: `@/*` → `src/*`. Stack: Next.js 16 (App Router, TS) · Supabase (Postgres · Email OTP · RLS) · Stripe.
 
-### Environments (diverges from PLAN.md's Vercel + local-only-dev assumptions)
-| env  | frontend       | database (cloud Supabase) | Stripe |
-|------|----------------|---------------------------|--------|
-| dev  | local (Docker) | shared project ↓          | TEST   |
-| stg  | **Netlify**    | shared with dev           | TEST   |
-| prod | **Netlify**    | separate project          | LIVE   |
+### Environments (diverges from PLAN.md's Vercel + local-Supabase assumptions)
+| env  | frontend            | database (cloud Supabase) | Stripe |
+|------|---------------------|---------------------------|--------|
+| dev  | local `next dev`    | shared project ↓          | TEST   |
+| stg  | **Netlify**         | shared with dev           | TEST   |
+| prod | **Netlify**         | separate project          | LIVE   |
+- **There is no local Supabase.** Every environment — including local `next dev` — talks to a
+  cloud Supabase project, selected by `.env.local`. Migrations are applied to cloud via the
+  Supabase MCP/dashboard (no CLI link/push, no Docker stack).
 - Hosting is **Netlify** (not Vercel): deploy via `@netlify/plugin-nextjs` + Netlify env
   contexts, not `vercel --prod`. Rate-limiting is Upstash Redis in all envs.
 - dev + stg **share one Supabase project** (test data and dev data co-mingle — split before
   stg holds real tester PII). Supabase **region is Asia Pacific** and is a one-way door per
   project; prod compliance framing under AP is an open question (not the plan's UK/EU GDPR).
-- **CI stays hermetic-local**: it runs `supabase start` for typegen/RLS checks with **no
-  Supabase token in CI** (public repo) — only the app runtime uses cloud. (CI workflow not
-  yet added; see PLAN.md §5.)
+- **CI** (when added): with no local stack, typegen/RLS checks that need a DB must run against
+  a cloud project — which requires a `SUPABASE_ACCESS_TOKEN`. In a **public repo**, that token
+  must live only in protected CI secrets and must point at the dev/stg project, never prod.
+  (CI workflow not yet added; see PLAN.md §5.)
 - **Per-environment key separation is mandatory**: prod = Stripe LIVE; dev/stg = Stripe TEST,
   each with its own `STRIPE_WEBHOOK_SECRET`. A Netlify preview must never carry prod creds.
 
@@ -93,7 +99,7 @@ The make-or-break of this system is the **onboarding spine**, front-loaded as "P
 - Migrations `001`–`004` in [supabase/migrations/](supabase/migrations/): `001` schema, `002` RLS, `003` onboarding trigger, `004` seed first admin.
 
 ### Cross-cutting invariants (span multiple files — these are the load-bearing rules)
-- **Tenant isolation is enforced by Postgres RLS, not app code.** RLS ([002_rls_policies.sql](supabase/migrations/002_rls_policies.sql)) is the true boundary; the `(tenant)/[slug]/layout.tsx` membership check is defense-in-depth, not a replacement. The repo ships an **`rls-policy-check` skill** ([.claude/skills/rls-policy-check/SKILL.md](.claude/skills/rls-policy-check/SKILL.md)) — invoke it when writing or reviewing any SQL under `supabase/migrations/`.
+- **Tenant isolation is enforced by Postgres RLS, not app code.** RLS ([002_rls_policies.sql](supabase/migrations/002_rls_policies.sql)) is the true boundary; the `(tenant)/[slug]/layout.tsx` membership check is defense-in-depth, not a replacement. The repo ships two tracked skills under [.claude/skills/](.claude/skills/): **`rls-policy-check`** — invoke when writing or reviewing any SQL under `supabase/migrations/`; and **`supabase-postgres-best-practices`** (installed from `supabase/agent-skills`, pinned in [skills-lock.json](skills-lock.json)) — for schema design, indexing, and query performance.
 - **The invite token is the authorization proof.** Possession of the invited inbox (OTP) *plus* the unguessable token are both required. The `003` `AFTER INSERT ON auth.users` trigger ([handle_new_user](supabase/migrations/003_onboarding.sql)) matches token+email on one row; no match → no profile → no access (fail closed).
 - **RLS helpers live in the `private` schema** (never `auth`/`public`), are `STABLE SECURITY DEFINER` with `SET search_path = ''`, fully-qualified inside, and wrapped in `(SELECT ...)` at call sites so the planner evaluates them once per query. Every tenant-scoped policy must **short-circuit `system_admin` first** (system_admin has `tenant_id = NULL`, so without the leading `OR` they are locked out of everything). A disabled/missing profile yields NULL role+tenant → matches nothing (fail closed).
 - **The service-role admin client ([lib/supabase/admin.ts](src/lib/supabase/admin.ts)) bypasses RLS**, so every route handler using it (checkout, booking, invitations, webhook) must **re-authenticate the caller AND authorize the specific resource** in code. [checkout/route.ts](src/app/api/stripe/checkout/route.ts) is the canonical IDOR defense: `getUser()` → re-fetch invoices filtered by `student.parent_id = user.id` and `status='pending'`, reject if fewer rows return than requested.

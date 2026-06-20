@@ -26,10 +26,11 @@ next-env.d.ts
 # === Vercel ===
 .vercel
 
-# === Supabase (local stack) ===
+# === Supabase ===
+# Cloud-only: no local stack. These guard against stray CLI artifacts if the
+# Supabase CLI is ever run locally, plus the throwaway bundle for manual apply.
 /supabase/.branches
 /supabase/.temp
-# Throwaway one-shot SQL bundle for manual dashboard apply
 /supabase/_cloud_apply_bundle.sql
 
 # === Testing ===
