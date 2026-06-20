@@ -1,24 +1,55 @@
-// Phase 0 exit-criteria verification harness (LOCAL DEV).
-// Drives the REAL onboarding spine via @supabase/supabase-js + Mailpit OTP codes,
-// then asserts tenant isolation / fail-closed behaviour through RLS.
+// Phase 0 exit-criteria verification harness (CLOUD).
+// Drives the REAL onboarding spine against the cloud Supabase project and asserts
+// tenant isolation / fail-closed behaviour through RLS.
 //
-// Run: node scripts/verify-phase0.mjs   (dev stack + supabase must be up)
+// There is no local stack and no Mailpit. Instead of polling an inbox for the OTP,
+// we use the service-role Admin API (`generateLink`), which returns the one-time
+// `email_otp` WITHOUT sending email. The invite token + full_name are carried in
+// user metadata (`data`), exactly as the app's signInWithOtp does, so the 003
+// `AFTER INSERT ON auth.users` trigger fires identically.
+//
+// This harness is SELF-CONTAINED: it seeds its own fixtures (tenants, invitations,
+// students, invoices) via the service-role client, runs the assertions, then
+// deletes every user/row it created. It mutates the shared cloud dev/stg DB, so it
+// uses clearly-namespaced fixtures and cleans up in a finally block.
+//
+// Run: node --env-file=.env.local scripts/verify-phase0.mjs
+//   Requires NEXT_PUBLIC_SUPABASE_URL, NEXT_PUBLIC_SUPABASE_ANON_KEY,
+//   SUPABASE_SERVICE_ROLE_KEY in .env.local, pointing at the cloud project.
 
 import { createClient } from "@supabase/supabase-js";
 
-// Keys come from env (load with `node --env-file=.env.local scripts/verify-phase0.mjs`).
-// These local-dev defaults are the PUBLIC supabase-demo shared keys (iss=supabase-demo),
-// kept only as a fallback so the harness runs against a stock local stack.
-const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL ?? "http://127.0.0.1:54321";
-const ANON =
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ??
-  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6ImFub24iLCJleHAiOjE5ODM4MTI5OTZ9.CRXP1A7WOeoJeXxjNni43kdQwgnWNReilDMblYTn_I0";
-const SERVICE =
-  process.env.SUPABASE_SERVICE_ROLE_KEY ??
-  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImV4cCI6MTk4MzgxMjk5Nn0.EGIM96RAZx35lJzdJsyH-qQwv8Hdp7fsn3W0YpN81IU";
-const MAILPIT = process.env.MAILPIT_URL ?? "http://127.0.0.1:54324";
+const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL;
+const ANON = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+const SERVICE = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
-const TENANT_B_INVOICE = "bbbb2222-2222-2222-2222-222222222222";
+if (!SUPABASE_URL || !ANON || !SERVICE) {
+  console.error(
+    "Missing env. Need NEXT_PUBLIC_SUPABASE_URL, NEXT_PUBLIC_SUPABASE_ANON_KEY, " +
+      "SUPABASE_SERVICE_ROLE_KEY (cloud project). Run with:",
+  );
+  console.error("  node --env-file=.env.local scripts/verify-phase0.mjs");
+  process.exit(2);
+}
+
+// Namespaced so this run's fixtures never collide with real data in the shared
+// cloud project, and so cleanup can target exactly what we created.
+const RUN = "phase0verify";
+const TENANT_A = "aaaaaaaa-0000-4000-8000-00000000aaaa";
+const TENANT_B = "bbbbbbbb-0000-4000-8000-00000000bbbb";
+const STUDENT_A = "a5a5a5a5-0000-4000-8000-00000000a5a5";
+const STUDENT_B = "b5b5b5b5-0000-4000-8000-00000000b5b5";
+const INVOICE_A = "a1a1a1a1-0000-4000-8000-00000000a1a1";
+const TENANT_B_INVOICE = "b1b1b1b1-0000-4000-8000-00000000b1b1";
+
+const email = (who) => `${RUN}+${who}@example.com`;
+const PARENT_A = email("parent-a");
+const PARENT_B = email("parent-b");
+const INTRUDER = email("intruder");
+const SYS_ADMIN = email("system-admin");
+
+const TOK_PARENT_A = `${RUN}-token-aurora-parent`;
+const TOK_SYS_ADMIN = `${RUN}-token-system-admin`;
 
 let pass = 0,
   fail = 0;
@@ -28,86 +59,92 @@ function check(name, ok, detail = "") {
   else fail++;
 }
 
-const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const anonClient = () => createClient(SUPABASE_URL, ANON, { auth: { persistSession: false } });
 const admin = createClient(SUPABASE_URL, SERVICE, { auth: { persistSession: false } });
 
-// Poll Mailpit for the newest OTP code sent to `email`.
-async function readOtp(email, sinceCount) {
-  for (let i = 0; i < 30; i++) {
-    const res = await fetch(`${MAILPIT}/api/v1/messages`);
-    const { messages } = await res.json();
-    const mine = messages.filter((m) => m.To.some((t) => t.Address === email));
-    if (mine.length > sinceCount) {
-      const id = mine[0].ID;
-      // Use the parsed .Text body (clean plaintext) — the raw JSON has \uXXXX
-      // escapes that break \b boundaries around the code.
-      const body = await (await fetch(`${MAILPIT}/api/v1/message/${id}`)).json();
-      const text = `${body.Text ?? ""}\n${body.HTML ?? ""}`;
-      const m = text.match(/(?<!\d)(\d{6})(?!\d)/);
-      if (m) return m[1];
-    }
-    await sleep(500);
-  }
-  throw new Error(`No OTP for ${email}`);
-}
-
-async function countMailsTo(email) {
-  const res = await fetch(`${MAILPIT}/api/v1/messages`);
-  const { messages } = await res.json();
-  return messages.filter((m) => m.To.some((t) => t.Address === email)).length;
-}
-
-// Full OTP onboarding: send (with optional invite_token) → read code → verify.
-async function onboard(email, inviteToken) {
-  const client = anonClient();
-  const before = await countMailsTo(email);
-  const { error: sendErr } = await client.auth.signInWithOtp({
-    email,
-    options: {
-      shouldCreateUser: true,
-      data: inviteToken ? { invite_token: inviteToken } : undefined,
-    },
+// Full OTP onboarding WITHOUT email: generateLink returns the OTP and carries the
+// invite_token through user metadata so the 003 trigger binds the profile.
+async function onboard(addr, inviteToken) {
+  const { data: gen, error: genErr } = await admin.auth.admin.generateLink({
+    type: "magiclink",
+    email: addr,
+    options: { data: inviteToken ? { invite_token: inviteToken } : {} },
   });
-  if (sendErr) throw new Error(`send: ${sendErr.message}`);
-  const code = await readOtp(email, before);
-  const { data, error } = await client.auth.verifyOtp({ email, token: code, type: "email" });
-  if (error) throw new Error(`verify: ${error.message}`);
+  if (genErr) throw new Error(`generateLink(${addr}): ${genErr.message}`);
+  const otp = gen.properties?.email_otp;
+  if (!otp) throw new Error(`no email_otp returned for ${addr}`);
+
+  const client = anonClient();
+  const { data, error } = await client.auth.verifyOtp({ email: addr, token: otp, type: "email" });
+  if (error) throw new Error(`verifyOtp(${addr}): ${error.message}`);
   return { client, user: data.user };
 }
 
-async function main() {
-  console.log("=== Phase 0 exit-criteria verification ===\n");
+// Idempotent self-seed of the fixtures this harness asserts against.
+async function seed() {
+  await admin.from("tenants").upsert([
+    { id: TENANT_A, name: "Aurora Primary (verify)", domain_slug: `${RUN}-aurora`, timezone: "Asia/Singapore" },
+    { id: TENANT_B, name: "Brighton Sports (verify)", domain_slug: `${RUN}-brighton`, timezone: "Asia/Singapore" },
+  ]);
+  await admin.from("invitations").upsert(
+    [
+      { tenant_id: TENANT_A, email: PARENT_A, role: "parent", token: TOK_PARENT_A, expires_at: new Date(Date.now() + 36e5).toISOString() },
+    ],
+    { onConflict: "token" },
+  );
+  await admin.from("students").upsert([
+    { id: STUDENT_A, tenant_id: TENANT_A, parent_id: null, parent_email: PARENT_A, full_name: "Amelia Tan", class_name: "Primary 3B" },
+    { id: STUDENT_B, tenant_id: TENANT_B, parent_id: null, parent_email: PARENT_B, full_name: "Ben Lim", class_name: "Squad U12" },
+  ]);
+  await admin.from("invoices").upsert([
+    { id: INVOICE_A, tenant_id: TENANT_A, student_id: STUDENT_A, description: "Term 1 tuition", amount_cents: 12500, currency: "sgd", status: "pending" },
+    { id: TENANT_B_INVOICE, tenant_id: TENANT_B, student_id: STUDENT_B, description: "Monthly membership", amount_cents: 8000, currency: "sgd", status: "pending" },
+  ]);
 
-  // Clean Mailpit so OTP reads aren't confused by stale messages.
-  await fetch(`${MAILPIT}/api/v1/messages`, { method: "DELETE" }).catch(() => {});
+  // The system_admin invite is normally seeded by migration 004 for a fixed email.
+  // Here we seed our own namespaced one so the run is self-contained.
+  await admin.from("invitations").upsert(
+    [{ tenant_id: null, email: SYS_ADMIN, role: "system_admin", token: TOK_SYS_ADMIN, expires_at: new Date(Date.now() + 36e5).toISOString() }],
+    { onConflict: "token" },
+  );
+}
+
+// Delete every user + row this harness created, in FK-safe order.
+async function cleanup() {
+  // Auth users (cascades profiles via the FK on profiles.id).
+  const { data: list } = await admin.auth.admin.listUsers({ perPage: 1000 });
+  const mine = (list?.users ?? []).filter((u) => u.email?.startsWith(`${RUN}+`));
+  for (const u of mine) await admin.auth.admin.deleteUser(u.id).catch(() => {});
+
+  await admin.from("invoices").delete().in("id", [INVOICE_A, TENANT_B_INVOICE]);
+  await admin.from("students").delete().in("id", [STUDENT_A, STUDENT_B]);
+  await admin.from("invitations").delete().in("token", [TOK_PARENT_A, TOK_SYS_ADMIN]);
+  await admin.from("tenants").delete().in("id", [TENANT_A, TENANT_B]);
+}
+
+async function main() {
+  console.log("=== Phase 0 exit-criteria verification (cloud) ===\n");
+  await cleanup(); // clear any leftovers from a previous interrupted run
+  await seed();
 
   // ---- Criterion 1+3: parent onboards via token+OTP → correct tenant/role ---
-  const { client: parentA, user: pAUser } = await onboard(
-    "parent-a@aurora.example",
-    "token-aurora-parent",
-  );
+  const { client: parentA, user: pAUser } = await onboard(PARENT_A, TOK_PARENT_A);
   const { data: pAProfile } = await parentA
     .from("profiles")
     .select("role, tenant_id, status")
     .eq("id", pAUser.id)
     .maybeSingle();
-  const { data: auroraTenant } = await admin
-    .from("tenants")
-    .select("id")
-    .eq("domain_slug", "aurora")
-    .single();
   check(
     "C1 parent onboards via invite token+OTP → role=parent in Aurora",
-    pAProfile?.role === "parent" && pAProfile?.tenant_id === auroraTenant.id,
-    `role=${pAProfile?.role} tenant=${pAProfile?.tenant_id === auroraTenant.id ? "aurora" : pAProfile?.tenant_id}`,
+    pAProfile?.role === "parent" && pAProfile?.tenant_id === TENANT_A,
+    `role=${pAProfile?.role} tenant=${pAProfile?.tenant_id === TENANT_A ? "aurora" : pAProfile?.tenant_id}`,
   );
 
   // ---- Criterion 3 (student link): pre-created student now linked ----
   const { data: linked } = await admin
     .from("students")
     .select("full_name, parent_id")
-    .eq("parent_email", "parent-a@aurora.example")
+    .eq("id", STUDENT_A)
     .maybeSingle();
   check(
     "C3 admin-pre-created student linked to parent on first login",
@@ -140,10 +177,7 @@ async function main() {
   );
 
   // ---- Criterion 2: wrong/absent token → no profile → no access ----
-  const { client: badTokenClient, user: badUser } = await onboard(
-    "intruder@nowhere.example",
-    "totally-wrong-token",
-  );
+  const { client: badTokenClient, user: badUser } = await onboard(INTRUDER, "totally-wrong-token");
   const { data: badProfile } = await badTokenClient
     .from("profiles")
     .select("id")
@@ -156,15 +190,12 @@ async function main() {
   );
 
   // ---- Criterion 6: system_admin sees both tenants ----
-  const { client: sysAdmin } = await onboard(
-    "admin@webcommspay.example",
-    "seed-system-admin-token-local-dev-only",
-  );
-  const { data: allTenants } = await sysAdmin.from("tenants").select("id, name");
+  const { client: sysAdmin } = await onboard(SYS_ADMIN, TOK_SYS_ADMIN);
+  const { data: adminTenants } = await sysAdmin.from("tenants").select("id").in("id", [TENANT_A, TENANT_B]);
   check(
     "C6 system_admin sees BOTH tenants (role short-circuit)",
-    allTenants?.length === 2,
-    `tenants=${allTenants?.length} (${allTenants?.map((t) => t.name).join(", ")})`,
+    adminTenants?.length === 2,
+    `tenants visible=${adminTenants?.length}`,
   );
 
   // ---- Criterion 7: disabled parent loses access (RLS fail-closed) ----
@@ -176,14 +207,16 @@ async function main() {
     (afterDisable?.length ?? 0) === 0,
     `rows after disable=${afterDisable?.length ?? 0}`,
   );
-  // restore for repeatability
-  await admin.from("profiles").update({ status: "active" }).eq("id", pAUser.id);
 
   console.log(`\n=== ${pass} passed, ${fail} failed ===`);
-  process.exit(fail === 0 ? 0 : 1);
 }
 
-main().catch((e) => {
-  console.error("HARNESS ERROR:", e);
-  process.exit(2);
-});
+main()
+  .catch((e) => {
+    console.error("HARNESS ERROR:", e);
+    fail++;
+  })
+  .finally(async () => {
+    await cleanup().catch((e) => console.error("CLEANUP ERROR:", e));
+    process.exit(fail === 0 ? 0 : 1);
+  });
