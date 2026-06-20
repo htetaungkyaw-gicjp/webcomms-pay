@@ -1,3 +1,11 @@
+import { clsx, type ClassValue } from "clsx";
+import { twMerge } from "tailwind-merge";
+
+/** Tailwind-aware className combiner (shadcn convention). */
+export function cn(...inputs: ClassValue[]): string {
+  return twMerge(clsx(inputs));
+}
+
 /** Format integer minor units (cents) as a currency string. */
 export function formatMoney(amountCents: number, currency: string): string {
   return new Intl.NumberFormat("en-SG", {

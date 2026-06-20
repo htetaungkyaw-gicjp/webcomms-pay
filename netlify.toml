@@ -1,0 +1,24 @@
+# Netlify deploy config (PLAN.md Status table: hosting is Netlify, not Vercel).
+# Next 16 App Router is served via @netlify/plugin-nextjs. Per-environment env
+# vars (Supabase URL/keys, Stripe TEST vs LIVE, Upstash, Resend) are set in the
+# Netlify UI under deploy contexts — NEVER committed here (public repo).
+#
+# Key separation (mandatory, PLAN.md Security ground rules):
+#   * production context  → prod Supabase + Stripe LIVE + its own webhook secret
+#   * deploy-preview / branch → dev/stg Supabase + Stripe TEST + test webhook secret
+# A preview build must never carry prod credentials.
+
+[build]
+  command = "npm run build"
+  publish = ".next"
+
+[build.environment]
+  # Reproducible installs from the committed lockfile (supply-chain hygiene).
+  NPM_FLAGS = "--no-audit"
+  NODE_VERSION = "20"
+
+[[plugins]]
+  package = "@netlify/plugin-nextjs"
+
+# Security headers are emitted by next.config.ts headers(); the Next runtime
+# plugin honours them. (Kept in code so they apply identically in `next dev`.)
