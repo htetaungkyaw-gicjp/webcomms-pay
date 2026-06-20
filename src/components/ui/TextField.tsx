@@ -14,7 +14,8 @@ export interface TextFieldProps
 
 export const TextField = React.forwardRef<HTMLInputElement, TextFieldProps>(
   ({ label, error, id, className, ...props }, ref) => {
-    const inputId = id ?? React.useId();
+    const generatedId = React.useId();
+    const inputId = id ?? generatedId;
     return (
       <div className="grid gap-1">
         <label

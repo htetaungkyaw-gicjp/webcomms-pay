@@ -2,14 +2,20 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { toast } from "sonner";
 
-import { createClient } from "@/lib/supabase/browser";
+import { Button } from "@/components/ui/Button";
+import { TextField } from "@/components/ui/TextField";
 
 /**
- * Plain OTP-send form. From /login there is NO invite token, so an uninvited
- * email that logs in binds nothing (the 003 trigger finds no invitation) and is
- * shown "ask your school for an invite" on /verify. The invite-carrying path is
- * /accept-invite, which passes options.data.invite_token.
+ * OTP-send form. Calls the server route /api/auth/otp/send, which enforces the
+ * per-email + per-IP send rate limit BEFORE asking Supabase to email a code (the
+ * client can't be trusted to self-limit). From /login there is no invite token,
+ * so an uninvited email binds nothing (the 003 trigger finds no invitation) and
+ * is shown "ask your school for an invite" on /verify. The invite-carrying path
+ * is /accept-invite, which passes the token through.
+ *
+ * Copy is end-user framed (DESIGN.md tone): "Email me a code".
  */
 export function LoginForm({
   inviteToken,
@@ -20,27 +26,21 @@ export function LoginForm({
 }) {
   const router = useRouter();
   const [email, setEmail] = useState(prefillEmail ?? "");
-  const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
     setPending(true);
-    setError(null);
 
-    const supabase = createClient();
-    const { error } = await supabase.auth.signInWithOtp({
-      email,
-      options: {
-        shouldCreateUser: true,
-        // The token is the authorization proof, carried through OTP into the
-        // 003 trigger. Absent on a plain /login → binds nothing.
-        data: inviteToken ? { invite_token: inviteToken } : undefined,
-      },
+    const res = await fetch("/api/auth/otp/send", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email, inviteToken }),
     });
 
-    if (error) {
-      setError(error.message);
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      toast.error(data.error ?? "Couldn't send a code. Try again.");
       setPending(false);
       return;
     }
@@ -51,21 +51,20 @@ export function LoginForm({
   }
 
   return (
-    <form onSubmit={onSubmit} style={{ display: "grid", gap: 12, maxWidth: 360 }}>
-      <label htmlFor="email">Email</label>
-      <input
-        id="email"
+    <form onSubmit={onSubmit} className="grid gap-4 max-w-sm">
+      <TextField
+        label="Email"
         type="email"
         required
         value={email}
+        readOnly={!!prefillEmail}
         onChange={(e) => setEmail(e.target.value)}
         placeholder="you@school.example"
-        style={{ padding: 8, border: "1px solid #ccc", borderRadius: 6 }}
+        autoComplete="email"
       />
-      <button type="submit" disabled={pending} style={{ padding: 10 }}>
-        {pending ? "Sending…" : "Send one-time code"}
-      </button>
-      {error && <p style={{ color: "crimson" }}>{error}</p>}
+      <Button type="submit" disabled={pending}>
+        {pending ? "Sending…" : "Email me a code"}
+      </Button>
     </form>
   );
 }
