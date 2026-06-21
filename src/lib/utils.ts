@@ -13,3 +13,12 @@ export function formatMoney(amountCents: number, currency: string): string {
     currency: currency.toUpperCase(),
   }).format(amountCents / 100);
 }
+
+/** Format an ISO timestamp in a tenant's IANA timezone (defaults to local). */
+export function formatDateTime(iso: string, timeZone?: string): string {
+  return new Intl.DateTimeFormat("en-GB", {
+    dateStyle: "medium",
+    timeStyle: "short",
+    ...(timeZone ? { timeZone } : {}),
+  }).format(new Date(iso));
+}
