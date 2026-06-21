@@ -45,9 +45,21 @@ export function LoginForm({
       return;
     }
 
+    // Navigate to the OTP entry screen. router.push targets /verify, an async
+    // Server Component; on some deployed Turbopack builds the client RSC
+    // navigation can silently no-op even though this handler ran (the email was
+    // sent). Fall back to a hard navigation so the user is never stranded on
+    // /login after a successful send.
     const params = new URLSearchParams({ email });
     if (inviteToken) params.set("token", inviteToken);
-    router.push(`/verify?${params.toString()}`);
+    const target = `/verify?${params.toString()}`;
+    router.push(target);
+    // If the soft navigation hasn't changed the URL shortly, force it.
+    window.setTimeout(() => {
+      if (window.location.pathname === "/login") {
+        window.location.assign(target);
+      }
+    }, 150);
   }
 
   return (
