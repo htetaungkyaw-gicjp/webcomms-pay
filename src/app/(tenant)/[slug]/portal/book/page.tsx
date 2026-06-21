@@ -1,6 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
+import { getHeaderContext } from "@/lib/auth-guards";
 import { formatDateTime } from "@/lib/utils";
-import { TopNav } from "@/components/dashboard/TopNav";
+import { AppHeader } from "@/components/dashboard/AppHeader";
 import { PortalNav } from "@/components/tenant/PortalNav";
 import { Card, CardTitle } from "@/components/ui/Card";
 import { Chip } from "@/components/ui/Chip";
@@ -23,6 +24,7 @@ export default async function PortalBookPage({
   const {
     data: { user },
   } = await supabase.auth.getUser();
+  const { role } = await getHeaderContext(supabase);
 
   const { data: children } = await supabase
     .from("students")
@@ -62,7 +64,7 @@ export default async function PortalBookPage({
 
   return (
     <main className="mx-auto w-full max-w-3xl p-4 sm:p-6 grid gap-6">
-      <TopNav title="Book a meeting" email={user?.email} subtitle={slug} />
+      <AppHeader role={role ?? "parent"} email={user?.email} title="Book a meeting" subtitle={slug} slug={slug} />
       <PortalNav slug={slug} active="book" />
 
       <Card variant="tonal">

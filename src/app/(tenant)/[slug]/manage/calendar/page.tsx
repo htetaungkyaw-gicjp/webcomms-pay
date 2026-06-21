@@ -1,6 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
+import { getHeaderContext } from "@/lib/auth-guards";
 import { formatDateTime } from "@/lib/utils";
-import { TopNav } from "@/components/dashboard/TopNav";
+import { AppHeader } from "@/components/dashboard/AppHeader";
 import { ManageNav } from "@/components/dashboard/ManageNav";
 import { Card, CardTitle } from "@/components/ui/Card";
 import { Chip } from "@/components/ui/Chip";
@@ -13,9 +14,7 @@ export default async function ManageCalendarPage({
 }) {
   const { slug } = await params;
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const { email, role } = await getHeaderContext(supabase);
 
   const { data: events } = await supabase
     .from("events")
@@ -24,7 +23,7 @@ export default async function ManageCalendarPage({
 
   return (
     <main className="mx-auto w-full max-w-5xl p-4 sm:p-6 grid gap-6">
-      <TopNav title="Calendar" email={user?.email} subtitle={slug} />
+      <AppHeader role={role ?? "tenant_admin"} email={email} title="Calendar" subtitle={slug} slug={slug} />
       <ManageNav slug={slug} active="calendar" />
 
       <div className="grid gap-6 md:grid-cols-[1fr_360px]">

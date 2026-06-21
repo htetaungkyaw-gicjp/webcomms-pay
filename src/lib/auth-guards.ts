@@ -36,6 +36,26 @@ export async function getCaller(
   };
 }
 
+/**
+ * Lightweight header context for server-rendered pages: the signed-in email and
+ * the caller's role, for AppHeader. Returns nulls if unauthenticated/no profile
+ * (the page's own guard or the layout handles redirect/notFound).
+ */
+export async function getHeaderContext(
+  supabase: SupabaseClient<Database>,
+): Promise<{ email: string | null; role: Caller["role"] | null }> {
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { email: null, role: null };
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("role")
+    .eq("id", user.id)
+    .maybeSingle();
+  return { email: user.email ?? null, role: profile?.role ?? null };
+}
+
 /** Require an active tenant_admin with a tenant. */
 export async function requireTenantAdmin(
   supabase: SupabaseClient<Database>,

@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
-import { TopNav } from "@/components/dashboard/TopNav";
+import { getHeaderContext } from "@/lib/auth-guards";
+import { AppHeader } from "@/components/dashboard/AppHeader";
 import { PortalNav } from "@/components/tenant/PortalNav";
 import { Card } from "@/components/ui/Card";
 import { CalendarView } from "@/components/tenant/CalendarView";
@@ -11,9 +12,7 @@ export default async function PortalCalendarPage({
 }) {
   const { slug } = await params;
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const { email, role } = await getHeaderContext(supabase);
 
   // RLS: tenant members read their tenant's events.
   const { data: events } = await supabase
@@ -23,7 +22,7 @@ export default async function PortalCalendarPage({
 
   return (
     <main className="mx-auto w-full max-w-4xl p-4 sm:p-6 grid gap-6">
-      <TopNav title="Calendar" email={user?.email} subtitle={slug} />
+      <AppHeader role={role ?? "parent"} email={email} title="Calendar" subtitle={slug} slug={slug} />
       <PortalNav slug={slug} active="calendar" />
       <Card>
         <CalendarView events={events ?? []} />
