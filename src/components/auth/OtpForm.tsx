@@ -2,25 +2,48 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { toast } from "sonner";
 
 import { createClient } from "@/lib/supabase/browser";
+import { Button } from "@/components/ui/Button";
+import { TextField } from "@/components/ui/TextField";
 
 /**
  * Verifies the 6-digit OTP. On success the 003 trigger has already run (it fires
  * AFTER INSERT ON auth.users at first verify), so we read the freshly-bound
  * profile and route by role. Fail closed: no profile row OR status='disabled'
  * → sign out and show "no access".
+ *
+ * Brute-force defense: each FAILED verify is reported to /api/auth/otp/verify-
+ * guard, which throttles per email+IP. Once the server says `blocked`, the form
+ * locks and tells the user to request a fresh code (the only auth factor, so the
+ * 1,000,000-key space must not be brute-forceable online — PLAN.md §2).
  */
 export function OtpForm({ email }: { email: string }) {
   const router = useRouter();
   const [code, setCode] = useState("");
-  const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
+  const [locked, setLocked] = useState(false);
+
+  async function reportFailure(): Promise<boolean> {
+    // Returns true if the user is now locked out.
+    try {
+      const res = await fetch("/api/auth/otp/verify-guard", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email }),
+      });
+      const data = await res.json().catch(() => ({}));
+      return !!data.blocked;
+    } catch {
+      return false;
+    }
+  }
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
+    if (locked) return;
     setPending(true);
-    setError(null);
 
     const supabase = createClient();
     const { data, error: verifyError } = await supabase.auth.verifyOtp({
@@ -30,7 +53,13 @@ export function OtpForm({ email }: { email: string }) {
     });
 
     if (verifyError || !data.user) {
-      setError(verifyError?.message ?? "Invalid code.");
+      const nowLocked = await reportFailure();
+      if (nowLocked) {
+        setLocked(true);
+        toast.error("Too many attempts. Request a new code to try again.");
+      } else {
+        toast.error(verifyError?.message ?? "Invalid code.");
+      }
       setPending(false);
       return;
     }
@@ -45,9 +74,7 @@ export function OtpForm({ email }: { email: string }) {
     // Fail closed: no invitation matched (no profile) or revoked.
     if (!profile || profile.status === "disabled") {
       await supabase.auth.signOut();
-      setError(
-        "No access for this account. Ask your school for an invitation link.",
-      );
+      toast.error("No access for this account. Ask your school for an invite link.");
       setPending(false);
       return;
     }
@@ -57,7 +84,6 @@ export function OtpForm({ email }: { email: string }) {
       return;
     }
 
-    // tenant_admin / parent need the tenant slug to build their URL.
     const { data: tenant } = await supabase
       .from("tenants")
       .select("domain_slug")
@@ -66,7 +92,7 @@ export function OtpForm({ email }: { email: string }) {
 
     if (!tenant) {
       await supabase.auth.signOut();
-      setError("Your tenant could not be resolved. Contact support.");
+      toast.error("Your tenant could not be resolved. Contact support.");
       setPending(false);
       return;
     }
@@ -79,24 +105,35 @@ export function OtpForm({ email }: { email: string }) {
   }
 
   return (
-    <form onSubmit={onSubmit} style={{ display: "grid", gap: 12, maxWidth: 360 }}>
-      <p>
-        Enter the 6-digit code sent to <strong>{email}</strong>.
+    <form onSubmit={onSubmit} className="grid gap-4 max-w-sm">
+      <p className="text-sm text-on-surface-variant">
+        Enter the 6-digit code we sent to <strong>{email}</strong>.
       </p>
-      <input
+      <TextField
+        label="One-time code"
         inputMode="numeric"
         pattern="[0-9]*"
         maxLength={6}
         required
+        disabled={locked}
         value={code}
-        onChange={(e) => setCode(e.target.value)}
+        onChange={(e) => setCode(e.target.value.replace(/\D/g, ""))}
         placeholder="123456"
-        style={{ padding: 8, border: "1px solid #ccc", borderRadius: 6, fontSize: 20, letterSpacing: 4 }}
+        className="text-xl tracking-[0.4em]"
+        autoComplete="one-time-code"
       />
-      <button type="submit" disabled={pending} style={{ padding: 10 }}>
+      <Button type="submit" disabled={pending || locked}>
         {pending ? "Verifying…" : "Verify"}
-      </button>
-      {error && <p style={{ color: "crimson" }}>{error}</p>}
+      </Button>
+      {locked && (
+        <p className="text-sm text-error">
+          Too many attempts.{" "}
+          <a href="/login" className="underline">
+            Request a new code
+          </a>
+          .
+        </p>
+      )}
     </form>
   );
 }

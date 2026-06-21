@@ -1,26 +1,29 @@
 "use client";
 
 import { useState } from "react";
+import { toast } from "sonner";
+
+import { Button } from "@/components/ui/Button";
 
 /**
  * Posts the caller's pending invoice ids to /api/stripe/checkout and redirects
  * to the returned Stripe Checkout URL. The ids are used ONLY as a filter — the
  * server re-verifies ownership and reads amounts from the DB (never trusts the
- * client). See PLAN.md §Phase 4.
+ * client). See PLAN.md §Phase 4. The button names the total (DESIGN.md tone).
  */
 export function PayAllButton({
   slug,
   invoiceIds,
+  label = "Pay all",
 }: {
   slug: string;
   invoiceIds: string[];
+  label?: string;
 }) {
   const [pending, setPending] = useState(false);
-  const [error, setError] = useState<string | null>(null);
 
   async function pay() {
     setPending(true);
-    setError(null);
     const res = await fetch("/api/stripe/checkout", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -28,7 +31,7 @@ export function PayAllButton({
     });
     if (!res.ok) {
       const body = await res.json().catch(() => ({}));
-      setError(body.error ?? `Checkout failed (${res.status}).`);
+      toast.error(body.error ?? `Checkout failed (${res.status}).`);
       setPending(false);
       return;
     }
@@ -36,14 +39,13 @@ export function PayAllButton({
     window.location.href = url;
   }
 
-  if (invoiceIds.length === 0) return <p>Nothing outstanding. 🎉</p>;
+  if (invoiceIds.length === 0) {
+    return <p className="text-sm text-on-surface-variant">Nothing outstanding. 🎉</p>;
+  }
 
   return (
-    <div>
-      <button onClick={pay} disabled={pending} style={{ padding: 10 }}>
-        {pending ? "Redirecting…" : `Pay all (${invoiceIds.length})`}
-      </button>
-      {error && <p style={{ color: "crimson" }}>{error}</p>}
-    </div>
+    <Button onClick={pay} disabled={pending}>
+      {pending ? "Redirecting…" : label}
+    </Button>
   );
 }

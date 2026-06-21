@@ -1,12 +1,17 @@
 import { notFound, redirect } from "next/navigation";
 
 import { createClient } from "@/lib/supabase/server";
+import { TenantTheme } from "@/components/tenant/TenantTheme";
 
 /**
  * Tenant resolution + membership guard (DEFENSE IN DEPTH, not the boundary —
  * RLS is). Resolves the tenant by domain_slug and asserts the authenticated
  * caller either belongs to it with status='active', or is a system_admin.
  * Anything else → notFound() (fail closed).
+ *
+ * Per-tenant theming (DESIGN.md): re-seed the M3 palette from the tenant record.
+ * (Until tenants carry a color column, TenantTheme is a no-op pass-through that
+ * keeps the default indigo seed — the hook is here for when the column lands.)
  */
 export default async function TenantLayout({
   children,
@@ -44,16 +49,5 @@ export default async function TenantLayout({
 
   if (!allowed) notFound();
 
-  return (
-    <div style={{ padding: 32 }}>
-      <header style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
-        <strong>{tenant.name}</strong>
-        <form action="/api/auth/signout" method="post">
-          <button type="submit" style={{ padding: "4px 10px" }}>Sign out</button>
-        </form>
-      </header>
-      <hr />
-      {children}
-    </div>
-  );
+  return <TenantTheme>{children}</TenantTheme>;
 }

@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 
 import { OtpForm } from "@/components/auth/OtpForm";
+import { Card, CardTitle } from "@/components/ui/Card";
 
 export default async function VerifyPage({
   searchParams,
@@ -11,9 +12,13 @@ export default async function VerifyPage({
   if (!email) redirect("/login");
 
   return (
-    <main style={{ padding: 32 }}>
-      <h1>Enter your code</h1>
-      <OtpForm email={email} />
+    <main className="min-h-screen grid place-items-center p-6">
+      <Card className="w-full max-w-md" variant="tonal">
+        <CardTitle>Enter your code</CardTitle>
+        <div className="mt-4">
+          <OtpForm email={email} />
+        </div>
+      </Card>
     </main>
   );
 }

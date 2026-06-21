@@ -7,33 +7,283 @@ export type Json =
   | Json[]
 
 export type Database = {
-  graphql_public: {
-    Tables: {
-      [_ in never]: never
-    }
-    Views: {
-      [_ in never]: never
-    }
-    Functions: {
-      graphql: {
-        Args: {
-          extensions?: Json
-          operationName?: string
-          query?: string
-          variables?: Json
-        }
-        Returns: Json
-      }
-    }
-    Enums: {
-      [_ in never]: never
-    }
-    CompositeTypes: {
-      [_ in never]: never
-    }
+  // Allows to automatically instantiate createClient with right options
+  // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
+  __InternalSupabase: {
+    PostgrestVersion: "14.5"
   }
   public: {
     Tables: {
+      announcement_acknowledgements: {
+        Row: {
+          acknowledged_at: string
+          announcement_id: string
+          id: string
+          parent_id: string
+        }
+        Insert: {
+          acknowledged_at?: string
+          announcement_id: string
+          id?: string
+          parent_id: string
+        }
+        Update: {
+          acknowledged_at?: string
+          announcement_id?: string
+          id?: string
+          parent_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "announcement_acknowledgements_announcement_id_fkey"
+            columns: ["announcement_id"]
+            isOneToOne: false
+            referencedRelation: "announcements"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "announcement_acknowledgements_parent_id_fkey"
+            columns: ["parent_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      announcements: {
+        Row: {
+          author_id: string | null
+          body: string
+          created_at: string
+          id: string
+          is_urgent: boolean
+          tenant_id: string
+          title: string
+        }
+        Insert: {
+          author_id?: string | null
+          body?: string
+          created_at?: string
+          id?: string
+          is_urgent?: boolean
+          tenant_id: string
+          title: string
+        }
+        Update: {
+          author_id?: string | null
+          body?: string
+          created_at?: string
+          id?: string
+          is_urgent?: boolean
+          tenant_id?: string
+          title?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "announcements_author_id_fkey"
+            columns: ["author_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "announcements_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      appointment_slots: {
+        Row: {
+          created_at: string
+          ends_at: string
+          id: string
+          starts_at: string
+          teacher_id: string
+          tenant_id: string
+        }
+        Insert: {
+          created_at?: string
+          ends_at: string
+          id?: string
+          starts_at: string
+          teacher_id: string
+          tenant_id: string
+        }
+        Update: {
+          created_at?: string
+          ends_at?: string
+          id?: string
+          starts_at?: string
+          teacher_id?: string
+          tenant_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "appointment_slots_teacher_id_fkey"
+            columns: ["teacher_id"]
+            isOneToOne: false
+            referencedRelation: "teachers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "appointment_slots_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      appointments: {
+        Row: {
+          created_at: string
+          id: string
+          notes: string
+          parent_id: string
+          slot_id: string
+          status: Database["public"]["Enums"]["appointment_status"]
+          student_id: string
+          tenant_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          notes?: string
+          parent_id: string
+          slot_id: string
+          status?: Database["public"]["Enums"]["appointment_status"]
+          student_id: string
+          tenant_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          notes?: string
+          parent_id?: string
+          slot_id?: string
+          status?: Database["public"]["Enums"]["appointment_status"]
+          student_id?: string
+          tenant_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "appointments_parent_id_fkey"
+            columns: ["parent_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "appointments_slot_id_fkey"
+            columns: ["slot_id"]
+            isOneToOne: false
+            referencedRelation: "appointment_slots"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "appointments_student_id_fkey"
+            columns: ["student_id"]
+            isOneToOne: false
+            referencedRelation: "students"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "appointments_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      audit_log: {
+        Row: {
+          action: string
+          actor_id: string | null
+          actor_role: Database["public"]["Enums"]["user_role"] | null
+          created_at: string
+          id: string
+          metadata: Json
+          target_id: string | null
+          target_table: string | null
+          tenant_id: string | null
+        }
+        Insert: {
+          action: string
+          actor_id?: string | null
+          actor_role?: Database["public"]["Enums"]["user_role"] | null
+          created_at?: string
+          id?: string
+          metadata?: Json
+          target_id?: string | null
+          target_table?: string | null
+          tenant_id?: string | null
+        }
+        Update: {
+          action?: string
+          actor_id?: string | null
+          actor_role?: Database["public"]["Enums"]["user_role"] | null
+          created_at?: string
+          id?: string
+          metadata?: Json
+          target_id?: string | null
+          target_table?: string | null
+          tenant_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "audit_log_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      events: {
+        Row: {
+          created_at: string
+          description: string
+          ends_at: string
+          event_type: Database["public"]["Enums"]["event_type"]
+          id: string
+          starts_at: string
+          tenant_id: string
+          title: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string
+          ends_at: string
+          event_type?: Database["public"]["Enums"]["event_type"]
+          id?: string
+          starts_at: string
+          tenant_id: string
+          title: string
+        }
+        Update: {
+          created_at?: string
+          description?: string
+          ends_at?: string
+          event_type?: Database["public"]["Enums"]["event_type"]
+          id?: string
+          starts_at?: string
+          tenant_id?: string
+          title?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "events_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       invitations: {
         Row: {
           accepted_at: string | null
@@ -227,6 +477,38 @@ export type Database = {
           },
         ]
       }
+      teachers: {
+        Row: {
+          class_name: string | null
+          created_at: string
+          full_name: string
+          id: string
+          tenant_id: string
+        }
+        Insert: {
+          class_name?: string | null
+          created_at?: string
+          full_name: string
+          id?: string
+          tenant_id: string
+        }
+        Update: {
+          class_name?: string | null
+          created_at?: string
+          full_name?: string
+          id?: string
+          tenant_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "teachers_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       tenants: {
         Row: {
           created_at: string
@@ -259,6 +541,8 @@ export type Database = {
       [_ in never]: never
     }
     Enums: {
+      appointment_status: "pending" | "confirmed" | "cancelled"
+      event_type: "general" | "holiday" | "exam" | "activity" | "meeting"
       invoice_status: "pending" | "paid" | "void"
       profile_status: "active" | "disabled"
       user_role: "system_admin" | "tenant_admin" | "parent"
@@ -387,15 +671,13 @@ export type CompositeTypes<
     : never
 
 export const Constants = {
-  graphql_public: {
-    Enums: {},
-  },
   public: {
     Enums: {
+      appointment_status: ["pending", "confirmed", "cancelled"],
+      event_type: ["general", "holiday", "exam", "activity", "meeting"],
       invoice_status: ["pending", "paid", "void"],
       profile_status: ["active", "disabled"],
       user_role: ["system_admin", "tenant_admin", "parent"],
     },
   },
 } as const
-

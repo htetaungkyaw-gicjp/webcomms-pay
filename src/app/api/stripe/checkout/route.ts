@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getStripe } from "@/lib/stripe";
+import { checkoutByUser, clientIp } from "@/lib/ratelimit";
 
 /**
  * Server-authoritative Stripe Checkout. Uses the admin client (it writes
@@ -26,6 +27,15 @@ export async function POST(request: Request) {
   } = await supabase.auth.getUser();
   if (!user) {
     return NextResponse.json({ error: "Not authenticated." }, { status: 401 });
+  }
+
+  // Per-user rate limit (anti-spam on an expensive external call).
+  const rl = await checkoutByUser(`${user.id}:${clientIp(request.headers)}`);
+  if (!rl.success) {
+    return NextResponse.json(
+      { error: "Too many checkout attempts. Please wait a moment." },
+      { status: 429 },
+    );
   }
 
   let body: { slug?: string; invoiceIds?: unknown };
