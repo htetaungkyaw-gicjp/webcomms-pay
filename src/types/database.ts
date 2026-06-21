@@ -515,6 +515,10 @@ export type Database = {
           domain_slug: string
           id: string
           name: string
+          stripe_account_id: string | null
+          stripe_charges_enabled: boolean
+          stripe_details_submitted: boolean
+          stripe_payouts_enabled: boolean
           timezone: string
         }
         Insert: {
@@ -522,6 +526,10 @@ export type Database = {
           domain_slug: string
           id?: string
           name: string
+          stripe_account_id?: string | null
+          stripe_charges_enabled?: boolean
+          stripe_details_submitted?: boolean
+          stripe_payouts_enabled?: boolean
           timezone?: string
         }
         Update: {
@@ -529,6 +537,10 @@ export type Database = {
           domain_slug?: string
           id?: string
           name?: string
+          stripe_account_id?: string | null
+          stripe_charges_enabled?: boolean
+          stripe_details_submitted?: boolean
+          stripe_payouts_enabled?: boolean
           timezone?: string
         }
         Relationships: []

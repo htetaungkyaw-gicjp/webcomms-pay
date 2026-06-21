@@ -64,7 +64,7 @@ export async function POST(request: Request) {
 
   const { data: invoices, error: invErr } = await admin
     .from("invoices")
-    .select("id, amount_cents, currency, description, student_id, status")
+    .select("id, amount_cents, currency, description, student_id, status, tenant_id")
     .in("id", requestedIds)
     .eq("status", "pending")
     .in("student_id", ownedStudentIds.length ? ownedStudentIds : ["00000000-0000-0000-0000-000000000000"]);
@@ -90,6 +90,22 @@ export async function POST(request: Request) {
     );
   }
 
+  // 3b. Connect gate (Phase 6, see PHASE-6-CONNECT.md). All owned invoices share
+  //     a tenant (RLS + the ownership filter guarantee it); load that tenant's
+  //     connected account and FAIL CLOSED unless it can accept payments. Never
+  //     start a checkout we can't route to the school.
+  const { data: tenant } = await admin
+    .from("tenants")
+    .select("stripe_account_id, stripe_charges_enabled")
+    .eq("id", invoices[0].tenant_id)
+    .single();
+  if (!tenant?.stripe_account_id || !tenant.stripe_charges_enabled) {
+    return NextResponse.json(
+      { error: "This organisation hasn't finished payment setup." },
+      { status: 409 },
+    );
+  }
+
   // 4. line_items from DB amounts only.
   const line_items = invoices.map((inv) => ({
     quantity: 1,
@@ -103,11 +119,20 @@ export async function POST(request: Request) {
   const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
 
   // 5. Create session + persist session.id for the webhook reverse-lookup.
+  //    Destination charge (Phase 6): funds settle into the tenant's connected
+  //    account; application_fee_amount is the platform's cut. v1 take rate is 0
+  //    (pricing TBD — see PHASE-6-CONNECT.md decision record); the field is here
+  //    so enabling a fee is a config change, not a code change.
+  const platformFeeCents = 0;
   const session = await getStripe().checkout.sessions.create({
     mode: "payment",
     line_items,
     success_url: `${appUrl}/payment-success`,
     cancel_url: `${appUrl}/payment-cancelled`,
+    payment_intent_data: {
+      ...(platformFeeCents > 0 ? { application_fee_amount: platformFeeCents } : {}),
+      transfer_data: { destination: tenant.stripe_account_id },
+    },
   });
 
   const { error: updErr } = await admin

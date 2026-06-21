@@ -89,6 +89,24 @@ export async function POST(request: Request) {
       }
       break;
     }
+    case "account.updated": {
+      // Connect account-state change (Phase 6, see PHASE-6-CONNECT.md). Sync the
+      // capability flags onto the tenant matched by stripe_account_id — this is
+      // what flips the checkout gate true once the school finishes Stripe
+      // verification. With destination charges this arrives on the PLATFORM
+      // account with the SAME signing secret, so no Connect webhook secret is
+      // needed. Idempotency is the processed_stripe_events insert above.
+      const account = event.data.object as Stripe.Account;
+      await admin
+        .from("tenants")
+        .update({
+          stripe_charges_enabled: account.charges_enabled ?? false,
+          stripe_payouts_enabled: account.payouts_enabled ?? false,
+          stripe_details_submitted: account.details_submitted ?? false,
+        })
+        .eq("stripe_account_id", account.id);
+      break;
+    }
     default:
       break;
   }
