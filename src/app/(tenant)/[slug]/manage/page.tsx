@@ -1,6 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
+import { getHeaderContext } from "@/lib/auth-guards";
 import { formatMoney } from "@/lib/utils";
-import { TopNav } from "@/components/dashboard/TopNav";
+import { AppHeader } from "@/components/dashboard/AppHeader";
 import { StatTile } from "@/components/dashboard/StatTile";
 import { Card, CardTitle } from "@/components/ui/Card";
 import { Chip } from "@/components/ui/Chip";
@@ -20,10 +21,7 @@ export default async function ManagePage({
 }) {
   const { slug } = await params;
   const supabase = await createClient();
-
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const { email, role } = await getHeaderContext(supabase);
 
   const { data: students } = await supabase
     .from("students")
@@ -46,7 +44,7 @@ export default async function ManagePage({
 
   return (
     <main className="mx-auto w-full max-w-5xl p-4 sm:p-6 grid gap-6">
-      <TopNav title="Manage" email={user?.email} subtitle={slug} />
+      <AppHeader role={role ?? "tenant_admin"} email={email} title="Manage" subtitle={slug} slug={slug} />
       <ManageNav slug={slug} active="overview" />
 
       <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">

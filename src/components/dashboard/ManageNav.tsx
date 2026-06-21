@@ -11,6 +11,7 @@ const SECTIONS = [
   { key: "announcements", label: "Announcements", path: "/announcements" },
   { key: "calendar", label: "Calendar", path: "/calendar" },
   { key: "slots", label: "Slots", path: "/slots" },
+  { key: "admins", label: "Admins", path: "/admins" },
 ] as const;
 
 export function ManageNav({

@@ -1,6 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
+import { getHeaderContext } from "@/lib/auth-guards";
 import { formatDateTime } from "@/lib/utils";
-import { TopNav } from "@/components/dashboard/TopNav";
+import { AppHeader } from "@/components/dashboard/AppHeader";
 import { PortalNav } from "@/components/tenant/PortalNav";
 import { Card } from "@/components/ui/Card";
 import { Chip } from "@/components/ui/Chip";
@@ -22,6 +23,7 @@ export default async function PortalNoticesPage({
   const {
     data: { user },
   } = await supabase.auth.getUser();
+  const { role } = await getHeaderContext(supabase);
 
   const { data: announcements } = await supabase
     .from("announcements")
@@ -37,7 +39,7 @@ export default async function PortalNoticesPage({
 
   return (
     <main className="mx-auto w-full max-w-3xl p-4 sm:p-6 grid gap-6">
-      <TopNav title="Notices" email={user?.email} subtitle={slug} />
+      <AppHeader role={role ?? "parent"} email={user?.email} title="Notices" subtitle={slug} slug={slug} />
       <PortalNav slug={slug} active="notices" />
 
       <div className="grid gap-3">
