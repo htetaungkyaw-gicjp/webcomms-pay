@@ -64,6 +64,31 @@ export async function POST(request: Request) {
         .neq("status", "paid");
       break;
     }
+    case "charge.refunded": {
+      // A refund (full or partial) was issued. Reverse-look-up the invoices by
+      // the charge's Checkout Session and void them so they're no longer treated
+      // as paid. The session id is on the PaymentIntent's latest charge; we
+      // resolve it via the charge → payment_intent → session.
+      const charge = event.data.object as Stripe.Charge;
+      const piId =
+        typeof charge.payment_intent === "string"
+          ? charge.payment_intent
+          : charge.payment_intent?.id;
+      if (piId) {
+        const sessions = await getStripe().checkout.sessions.list({
+          payment_intent: piId,
+          limit: 1,
+        });
+        const sessionId = sessions.data[0]?.id;
+        if (sessionId) {
+          await admin
+            .from("invoices")
+            .update({ status: "void" })
+            .eq("stripe_checkout_session_id", sessionId);
+        }
+      }
+      break;
+    }
     default:
       break;
   }

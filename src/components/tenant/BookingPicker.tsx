@@ -83,7 +83,7 @@ export function BookingPicker({
           onChange={(e) => setChildId(e.target.value)}
           className="h-12 rounded-t-[8px] border-0 border-b-2 border-outline bg-surface-container px-3 text-on-surface focus:border-primary outline-none"
         >
-          {children.map((c) => (
+          {students.map((c) => (
             <option key={c.id} value={c.id}>
               {c.full_name}
               {c.class_name ? ` (${c.class_name})` : ""}
