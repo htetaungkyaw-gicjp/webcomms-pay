@@ -23,7 +23,13 @@ function buildCsp(nonce: string): string {
   const supabaseWs = supabaseUrl.replace(/^https/, "wss");
   return [
     `default-src 'self'`,
-    `script-src 'self' 'nonce-${nonce}' https://js.stripe.com`,
+    // 'strict-dynamic' is the documented recipe for nonce-based CSP in Next: the
+    // nonced bootstrap script is trusted to load the chunk scripts it injects.
+    // Note: under 'strict-dynamic' browsers IGNORE host allowlists in script-src
+    // ('self', js.stripe.com) — only the nonce + scripts it loads run. Stripe.js
+    // is pulled in by the nonced Next bundle, so that trust propagates. The
+    // host entries are kept as a fallback for browsers without strict-dynamic.
+    `script-src 'self' 'nonce-${nonce}' 'strict-dynamic' https://js.stripe.com`,
     `style-src 'self' 'unsafe-inline'`,
     `img-src 'self' data: blob: https://*.stripe.com`,
     `font-src 'self' data:`,
