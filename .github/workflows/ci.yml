@@ -41,6 +41,12 @@ jobs:
 
   secret-scan:
     runs-on: ubuntu-latest
+    # gitleaks-action queries the PR's commits via the API, so it needs the
+    # automatically-provided GITHUB_TOKEN plus read access to pull-requests
+    # (top-level grants only contents: read). Least-privilege: scoped to this job.
+    permissions:
+      contents: read
+      pull-requests: read
     steps:
       # actions/checkout@v4.2.2 — full history for a complete scan
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
@@ -49,6 +55,8 @@ jobs:
       # gitleaks/gitleaks-action@v2.3.7
       - uses: gitleaks/gitleaks-action@83373cf2f8c4db6e24b41c1a9b086bb9619e9cd3
         env:
+          # Required since gitleaks-action v2 to scan pull requests.
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GITLEAKS_ENABLE_UPLOAD_ARTIFACT: "false"
 
   # Typegen-staleness guard. Cloud-only repo: there is no local Supabase stack in
