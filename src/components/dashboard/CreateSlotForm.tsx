@@ -6,6 +6,7 @@ import { toast } from "sonner";
 
 import { Button } from "@/components/ui/Button";
 import { TextField } from "@/components/ui/TextField";
+import { Select } from "@/components/ui/Select";
 
 /** tenant_admin: create an appointment slot for a teacher. */
 export function CreateSlotForm({
@@ -56,21 +57,18 @@ export function CreateSlotForm({
 
   return (
     <form onSubmit={onSubmit} className="grid gap-4">
-      <div className="grid gap-1">
-        <label className="text-xs font-medium text-on-surface-variant">Teacher</label>
-        <select
-          value={teacherId}
-          onChange={(e) => setTeacherId(e.target.value)}
-          className="h-12 rounded-t-[8px] border-0 border-b-2 border-outline bg-surface-container px-3 text-on-surface focus:border-primary outline-none"
-        >
-          {teachers.map((t) => (
-            <option key={t.id} value={t.id}>
-              {t.full_name}
-              {t.class_name ? ` (${t.class_name})` : ""}
-            </option>
-          ))}
-        </select>
-      </div>
+      <Select
+        label="Teacher"
+        value={teacherId}
+        onChange={(e) => setTeacherId(e.target.value)}
+      >
+        {teachers.map((t) => (
+          <option key={t.id} value={t.id}>
+            {t.full_name}
+            {t.class_name ? ` (${t.class_name})` : ""}
+          </option>
+        ))}
+      </Select>
       <TextField
         label="Starts"
         type="datetime-local"

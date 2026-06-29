@@ -5,6 +5,7 @@ import { createClient } from "@/lib/supabase/server";
 import { AppHeader } from "@/components/dashboard/AppHeader";
 import { StatTile } from "@/components/dashboard/StatTile";
 import { Card, CardTitle } from "@/components/ui/Card";
+import { NavPill } from "@/components/ui/NavPill";
 import { CreateTenantForm } from "@/components/dashboard/CreateTenantForm";
 
 /**
@@ -57,18 +58,16 @@ export default async function AdminPage() {
                     <code className="text-xs text-on-surface-variant">/{t.domain_slug}</code>
                   </Link>
                   <div className="flex items-center gap-1">
-                    <Link
-                      href={`/admin/tenants/${t.id}`}
-                      className="rounded-full px-4 h-9 grid place-items-center text-sm font-medium text-on-surface-variant hover:bg-surface-container-high"
-                    >
+                    <NavPill href={`/admin/tenants/${t.id}`} tone="ghost">
                       Admins
-                    </Link>
-                    <Link
+                    </NavPill>
+                    <NavPill
                       href={`/${t.domain_slug}/manage`}
-                      className="rounded-full px-4 h-9 grid place-items-center text-sm font-medium text-primary hover:bg-primary/8"
+                      tone="ghost"
+                      className="text-primary hover:bg-primary/8"
                     >
                       Open
-                    </Link>
+                    </NavPill>
                   </div>
                 </li>
               ))

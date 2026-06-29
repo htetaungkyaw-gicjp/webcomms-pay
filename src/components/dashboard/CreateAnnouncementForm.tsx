@@ -6,6 +6,8 @@ import { toast } from "sonner";
 
 import { Button } from "@/components/ui/Button";
 import { TextField } from "@/components/ui/TextField";
+import { Textarea } from "@/components/ui/Textarea";
+import { Checkbox } from "@/components/ui/Checkbox";
 
 /** tenant_admin: post an announcement. Server sanitizes input to plain text. */
 export function CreateAnnouncementForm() {
@@ -46,24 +48,17 @@ export function CreateAnnouncementForm() {
         onChange={(e) => setTitle(e.target.value)}
         placeholder="Sports day moved to Friday"
       />
-      <div className="grid gap-1">
-        <label className="text-xs font-medium text-on-surface-variant">Message</label>
-        <textarea
-          value={body}
-          onChange={(e) => setBody(e.target.value)}
-          rows={4}
-          className="rounded-t-[8px] border-0 border-b-2 border-outline bg-surface-container px-3 py-2 text-on-surface focus:border-primary outline-none"
-          placeholder="Details for parents…"
-        />
-      </div>
-      <label className="flex items-center gap-2 text-sm">
-        <input
-          type="checkbox"
-          checked={isUrgent}
-          onChange={(e) => setIsUrgent(e.target.checked)}
-        />
-        Mark as urgent
-      </label>
+      <Textarea
+        label="Message"
+        value={body}
+        onChange={(e) => setBody(e.target.value)}
+        placeholder="Details for parents…"
+      />
+      <Checkbox
+        label="Mark as urgent"
+        checked={isUrgent}
+        onChange={(e) => setIsUrgent(e.target.checked)}
+      />
       <Button type="submit" disabled={pending}>
         {pending ? "Posting…" : "Post announcement"}
       </Button>

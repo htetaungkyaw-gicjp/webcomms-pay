@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/Button";
+import { Select } from "@/components/ui/Select";
 import { formatDateTime } from "@/lib/utils";
 
 type Child = { id: string; full_name: string; class_name: string | null };
@@ -76,21 +77,18 @@ export function BookingPicker({
 
   return (
     <div className="grid gap-4">
-      <div className="grid gap-1">
-        <label className="text-xs font-medium text-on-surface-variant">Child</label>
-        <select
-          value={childId}
-          onChange={(e) => setChildId(e.target.value)}
-          className="h-12 rounded-t-[8px] border-0 border-b-2 border-outline bg-surface-container px-3 text-on-surface focus:border-primary outline-none"
-        >
-          {students.map((c) => (
-            <option key={c.id} value={c.id}>
-              {c.full_name}
-              {c.class_name ? ` (${c.class_name})` : ""}
-            </option>
-          ))}
-        </select>
-      </div>
+      <Select
+        label="Child"
+        value={childId}
+        onChange={(e) => setChildId(e.target.value)}
+      >
+        {students.map((c) => (
+          <option key={c.id} value={c.id}>
+            {c.full_name}
+            {c.class_name ? ` (${c.class_name})` : ""}
+          </option>
+        ))}
+      </Select>
 
       {!child?.class_name ? (
         <p className="text-sm text-on-surface-variant">
@@ -105,7 +103,7 @@ export function BookingPicker({
           {visibleSlots.map((s) => (
             <li
               key={s.id}
-              className="flex items-center justify-between rounded-[12px] border border-outline-variant p-3"
+              className="flex items-center justify-between rounded-md border border-outline-variant p-3"
             >
               <div>
                 <div className="text-sm font-medium text-on-surface">{s.teacher_name}</div>

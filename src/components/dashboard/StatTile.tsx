@@ -23,7 +23,7 @@ export function StatTile({
   tone?: Tone;
 }) {
   return (
-    <div className={cn("rounded-[16px] p-5", tones[tone])}>
+    <div className={cn("rounded-md p-5", tones[tone])}>
       <div className="tabular font-display text-3xl font-medium">{value}</div>
       <div className="mt-1 text-sm opacity-80">{label}</div>
     </div>
