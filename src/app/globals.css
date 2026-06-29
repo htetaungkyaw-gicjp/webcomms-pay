@@ -3,26 +3,28 @@
 /* ============================================================================
    Material 3 Expressive token theme (DESIGN.md). Tailwind v4 @theme maps each
    M3 color role to a utility (bg-primary, text-on-primary, bg-primary-container,
-   …). Light scheme seeded from indigo #4f46e5. Per-tenant theming re-seeds the
+   …). Light scheme seeded from sky blue (primary #1f8fd6) + light green
+   (secondary/tertiary), on an airy near-white surface — calm, spacious, soft
+   (UX reference: Google Antigravity). Per-tenant theming re-seeds the
    --md-primary* CSS vars at the [slug] layout (see TenantTheme).
    ============================================================================ */
 
 :root {
-  /* Color roles — light scheme */
-  --md-primary: #4f46e5;
+  /* Color roles — light scheme. Primary = sky blue, secondary/tertiary = green. */
+  --md-primary: #1f8fd6;
   --md-on-primary: #ffffff;
-  --md-primary-container: #e3e0ff;
-  --md-on-primary-container: #15006d;
+  --md-primary-container: #cfeaff;
+  --md-on-primary-container: #00344f;
 
-  --md-secondary: #5b5d72;
+  --md-secondary: #3a9b6e;
   --md-on-secondary: #ffffff;
-  --md-secondary-container: #e0e1f9;
-  --md-on-secondary-container: #181a2c;
+  --md-secondary-container: #c4f0d8;
+  --md-on-secondary-container: #00210f;
 
-  --md-tertiary: #79536a;
+  --md-tertiary: #5aa86a;
   --md-on-tertiary: #ffffff;
-  --md-tertiary-container: #ffd8ec;
-  --md-on-tertiary-container: #2e1124;
+  --md-tertiary-container: #d3f3d0;
+  --md-on-tertiary-container: #08210d;
 
   --md-error: #ba1a1a;
   --md-on-error: #ffffff;
@@ -34,18 +36,30 @@
   --md-success-container: #b3f1c6;
   --md-on-success-container: #00210f;
 
-  /* Surfaces & neutrals */
-  --md-background: #fbf8ff;
-  --md-surface: #fbf8ff;
-  --md-on-surface: #1b1b21;
-  --md-on-surface-variant: #46464f;
-  --md-surface-container-low: #f3f0fa;
-  --md-surface-container: #edeaf6;
-  --md-surface-container-high: #e7e4f2;
-  --md-surface-container-highest: #e1deee;
-  --md-surface-variant: #e4e1ec;
-  --md-outline: #777680;
-  --md-outline-variant: #c7c5d0;
+  /* Surfaces & neutrals — airy, faint blue-green tint. */
+  --md-background: #f6fbfb;
+  --md-surface: #f9fdfd;
+  --md-on-surface: #181c1d;
+  --md-on-surface-variant: #3f4a4d;
+  --md-surface-container-low: #eef6f6;
+  --md-surface-container: #e8f2f2;
+  --md-surface-container-high: #e1edee;
+  --md-surface-container-highest: #d9e8e9;
+  --md-surface-variant: #dde7e8;
+  --md-outline: #6d7779;
+  --md-outline-variant: #c0cbcc;
+
+  /* Soft ambient gradient for hero/auth surfaces (Antigravity-style wash). */
+  --md-hero-gradient: radial-gradient(
+      120% 120% at 0% 0%,
+      color-mix(in srgb, var(--md-primary) 16%, transparent),
+      transparent 55%
+    ),
+    radial-gradient(
+      120% 120% at 100% 100%,
+      color-mix(in srgb, var(--md-secondary) 18%, transparent),
+      transparent 55%
+    );
 }
 
 @theme inline {
@@ -108,6 +122,28 @@ body {
 /* Tabular numerals for amounts/stats (DESIGN.md typography). */
 .tabular {
   font-variant-numeric: tabular-nums;
+}
+
+/* Soft ambient wash for hero/auth backdrops (Antigravity-style). Sits behind
+   content on the page background; pair with a centered card. */
+.hero-wash {
+  background-image: var(--md-hero-gradient);
+}
+
+/* Gentle entrance for cards/heroes — calm, not flashy. Disabled under
+   prefers-reduced-motion by the rule below. */
+@keyframes rise-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+.rise-in {
+  animation: rise-in 0.5s cubic-bezier(0.2, 0.7, 0.2, 1) both;
 }
 
 /* Visible keyboard focus — 3px primary outline (DESIGN.md quality floor). */

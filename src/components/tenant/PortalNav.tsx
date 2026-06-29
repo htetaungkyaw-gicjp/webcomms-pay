@@ -1,5 +1,4 @@
-import Link from "next/link";
-import { cn } from "@/lib/utils";
+import { NavPill } from "@/components/ui/NavPill";
 
 /** Parent portal section nav (M3 tonal pills). */
 const SECTIONS = [
@@ -19,18 +18,13 @@ export function PortalNav({
   return (
     <nav className="flex flex-wrap gap-2">
       {SECTIONS.map((s) => (
-        <Link
+        <NavPill
           key={s.key}
           href={`/${slug}/portal${s.path}`}
-          className={cn(
-            "rounded-full px-4 h-9 grid place-items-center text-sm font-medium transition-colors",
-            s.key === active
-              ? "bg-primary text-on-primary"
-              : "bg-surface-container text-on-surface-variant hover:bg-surface-container-high",
-          )}
+          active={s.key === active}
         >
           {s.label}
-        </Link>
+        </NavPill>
       ))}
     </nav>
   );

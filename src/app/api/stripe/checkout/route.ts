@@ -117,6 +117,12 @@ export async function POST(request: Request) {
   }));
 
   const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
+  // Carry the tenant slug onto the return pages so their CTAs can link straight
+  // back to the parent's portal. Presentation-only; not trusted for auth.
+  const slugQuery =
+    typeof body.slug === "string" && body.slug
+      ? `?slug=${encodeURIComponent(body.slug)}`
+      : "";
 
   // 5. Create session + persist session.id for the webhook reverse-lookup.
   //    Destination charge (Phase 6): funds settle into the tenant's connected
@@ -127,8 +133,8 @@ export async function POST(request: Request) {
   const session = await getStripe().checkout.sessions.create({
     mode: "payment",
     line_items,
-    success_url: `${appUrl}/payment-success`,
-    cancel_url: `${appUrl}/payment-cancelled`,
+    success_url: `${appUrl}/payment-success${slugQuery}`,
+    cancel_url: `${appUrl}/payment-cancelled${slugQuery}`,
     payment_intent_data: {
       ...(platformFeeCents > 0 ? { application_fee_amount: platformFeeCents } : {}),
       transfer_data: { destination: tenant.stripe_account_id },

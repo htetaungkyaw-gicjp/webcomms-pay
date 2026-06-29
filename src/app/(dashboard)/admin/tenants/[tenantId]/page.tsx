@@ -1,11 +1,11 @@
 import { redirect, notFound } from "next/navigation";
-import Link from "next/link";
 
 import { createClient } from "@/lib/supabase/server";
 import { AppHeader } from "@/components/dashboard/AppHeader";
 import { StatTile } from "@/components/dashboard/StatTile";
 import { Card, CardTitle } from "@/components/ui/Card";
 import { Chip } from "@/components/ui/Chip";
+import { NavPill } from "@/components/ui/NavPill";
 
 /**
  * system_admin: drill into a single tenant to see WHO its admins are (and a
@@ -75,13 +75,14 @@ export default async function TenantDetailPage({
         <StatTile label="Admins" value={admins.length} tone="primary" />
         <StatTile label="Parents" value={parents.length} tone="secondary" />
         <StatTile label="Pending invites" value={pendingInvites?.length ?? 0} tone="neutral" />
-        <div className="grid place-items-center rounded-[16px] bg-surface-container-high p-5">
-          <Link
+        <div className="grid place-items-center rounded-md bg-surface-container-high p-5">
+          <NavPill
             href={`/${tenant.domain_slug}/manage`}
-            className="rounded-full px-4 h-9 grid place-items-center text-sm font-medium text-primary hover:bg-primary/8"
+            tone="ghost"
+            className="text-primary hover:bg-primary/8"
           >
             Open manage →
-          </Link>
+          </NavPill>
         </div>
       </div>
 

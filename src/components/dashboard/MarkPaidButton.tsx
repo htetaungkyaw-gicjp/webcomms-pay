@@ -4,6 +4,8 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 
+import { Button } from "@/components/ui/Button";
+
 /**
  * tenant_admin: settle a pending invoice that was paid OUTSIDE Stripe (cash /
  * bank transfer). Posts to /api/manage/invoices/mark-paid; the server re-verifies
@@ -33,13 +35,14 @@ export function MarkPaidButton({ invoiceId }: { invoiceId: string }) {
   }
 
   return (
-    <button
+    <Button
       type="button"
+      variant="text"
+      size="sm"
       onClick={markPaid}
       disabled={pending}
-      className="rounded-full px-3 h-8 text-xs font-medium text-primary hover:bg-primary/8 disabled:opacity-50"
     >
       {pending ? "Saving…" : "Mark paid"}
-    </button>
+    </Button>
   );
 }

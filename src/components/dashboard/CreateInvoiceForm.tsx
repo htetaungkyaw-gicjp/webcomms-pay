@@ -6,6 +6,7 @@ import { toast } from "sonner";
 
 import { Button } from "@/components/ui/Button";
 import { TextField } from "@/components/ui/TextField";
+import { Select } from "@/components/ui/Select";
 
 /** tenant_admin: create an invoice for one of the tenant's students. */
 export function CreateInvoiceForm({
@@ -55,20 +56,17 @@ export function CreateInvoiceForm({
 
   return (
     <form onSubmit={onSubmit} className="grid gap-4">
-      <div className="grid gap-1">
-        <label className="text-xs font-medium text-on-surface-variant">Child</label>
-        <select
-          value={studentId}
-          onChange={(e) => setStudentId(e.target.value)}
-          className="h-12 rounded-t-[8px] border-0 border-b-2 border-outline bg-surface-container px-3 text-on-surface focus:border-primary outline-none"
-        >
-          {students.map((s) => (
-            <option key={s.id} value={s.id}>
-              {s.full_name}
-            </option>
-          ))}
-        </select>
-      </div>
+      <Select
+        label="Child"
+        value={studentId}
+        onChange={(e) => setStudentId(e.target.value)}
+      >
+        {students.map((s) => (
+          <option key={s.id} value={s.id}>
+            {s.full_name}
+          </option>
+        ))}
+      </Select>
       <TextField
         label="Description"
         required

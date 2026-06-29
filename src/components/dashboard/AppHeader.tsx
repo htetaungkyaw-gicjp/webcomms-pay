@@ -1,7 +1,8 @@
 import Link from "next/link";
 
 import type { Database } from "@/types/database";
-import { cn } from "@/lib/utils";
+import { Button } from "@/components/ui/Button";
+import { NavPill } from "@/components/ui/NavPill";
 
 type Role = Database["public"]["Enums"]["user_role"];
 
@@ -56,7 +57,7 @@ export function AppHeader({
   const links = linksFor(role, slug);
 
   return (
-    <header className="flex flex-wrap items-center justify-between gap-4 rounded-[16px] bg-surface-container px-5 py-3">
+    <header className="flex flex-wrap items-center justify-between gap-4 rounded-md bg-surface-container px-5 py-3">
       <div className="flex items-center gap-3">
         <Link href="/" className="font-display text-lg font-medium text-on-surface">
           WebComms&nbsp;&amp;&nbsp;Pay
@@ -70,16 +71,9 @@ export function AppHeader({
         {links.length > 0 && (
           <nav className="flex flex-wrap items-center gap-1">
             {links.map((l) => (
-              <Link
-                key={l.href}
-                href={l.href}
-                className={cn(
-                  "rounded-full px-3 h-9 grid place-items-center text-sm font-medium",
-                  "text-on-surface-variant hover:bg-surface-container-high transition-colors",
-                )}
-              >
+              <NavPill key={l.href} href={l.href} tone="ghost" className="px-3">
                 {l.label}
-              </Link>
+              </NavPill>
             ))}
           </nav>
         )}
@@ -87,12 +81,9 @@ export function AppHeader({
           <span className="hidden text-sm text-on-surface-variant sm:inline">{email}</span>
         )}
         <form action="/api/auth/signout" method="post">
-          <button
-            type="submit"
-            className="rounded-full px-4 h-9 text-sm font-medium text-primary hover:bg-primary/8"
-          >
+          <Button type="submit" variant="text" size="sm">
             Sign out
-          </button>
+          </Button>
         </form>
       </div>
 

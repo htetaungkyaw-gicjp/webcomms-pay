@@ -33,7 +33,7 @@ export default async function ManageAnnouncementsPage({
               announcements.map((a) => (
                 <li
                   key={a.id}
-                  className="rounded-[16px] border border-outline-variant p-4"
+                  className="rounded-md border border-outline-variant p-4"
                 >
                   <div className="flex items-center justify-between gap-2">
                     {/* Escaped text render — never dangerouslySetInnerHTML. */}

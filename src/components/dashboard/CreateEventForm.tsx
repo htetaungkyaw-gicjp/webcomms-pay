@@ -6,6 +6,7 @@ import { toast } from "sonner";
 
 import { Button } from "@/components/ui/Button";
 import { TextField } from "@/components/ui/TextField";
+import { Select } from "@/components/ui/Select";
 
 const TYPES = ["general", "holiday", "exam", "activity", "meeting"] as const;
 
@@ -58,20 +59,18 @@ export function CreateEventForm() {
         onChange={(e) => setTitle(e.target.value)}
         placeholder="Parents' evening"
       />
-      <div className="grid gap-1">
-        <label className="text-xs font-medium text-on-surface-variant">Type</label>
-        <select
-          value={eventType}
-          onChange={(e) => setEventType(e.target.value as (typeof TYPES)[number])}
-          className="h-12 rounded-t-[8px] border-0 border-b-2 border-outline bg-surface-container px-3 text-on-surface focus:border-primary outline-none"
-        >
-          {TYPES.map((t) => (
-            <option key={t} value={t}>
-              {t}
-            </option>
-          ))}
-        </select>
-      </div>
+      <Select
+        label="Type"
+        value={eventType}
+        onChange={(e) => setEventType(e.target.value as (typeof TYPES)[number])}
+        className="capitalize"
+      >
+        {TYPES.map((t) => (
+          <option key={t} value={t} className="capitalize">
+            {t}
+          </option>
+        ))}
+      </Select>
       <TextField
         label="Starts"
         type="datetime-local"

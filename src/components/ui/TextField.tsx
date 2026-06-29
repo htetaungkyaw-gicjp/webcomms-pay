@@ -2,6 +2,15 @@ import * as React from "react";
 import { cn } from "@/lib/utils";
 
 /**
+ * Shared M3 "filled" control style (DESIGN.md §Components): filled surface,
+ * bottom underline, focus thickens/colors the underline to primary. Used by
+ * TextField, Select, and Textarea so every form control matches exactly.
+ */
+export const filledControl =
+  "rounded-t-[8px] border-0 border-b-2 border-outline bg-surface-container px-3 " +
+  "text-on-surface outline-none transition-colors focus:border-primary";
+
+/**
  * M3 filled text field (DESIGN.md §Components): filled surface, bottom underline,
  * label above. Focus thickens/colors the underline to primary (via focus ring on
  * the wrapper). Kept simple — a real floating label is optional polish.
@@ -28,9 +37,9 @@ export const TextField = React.forwardRef<HTMLInputElement, TextFieldProps>(
           ref={ref}
           id={inputId}
           className={cn(
-            "h-12 rounded-t-[8px] border-0 border-b-2 bg-surface-container px-3 text-on-surface",
-            "outline-none focus:border-primary",
-            error ? "border-error" : "border-outline",
+            "h-12",
+            filledControl,
+            error && "border-error",
             className,
           )}
           aria-invalid={!!error}

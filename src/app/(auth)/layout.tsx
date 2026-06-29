@@ -21,5 +21,6 @@ export default function AuthLayout({
 }: {
   children: React.ReactNode;
 }) {
-  return children;
+  // Soft ambient wash behind the centered auth card (Antigravity-style).
+  return <div className="hero-wash min-h-screen">{children}</div>;
 }
